@@ -9,15 +9,16 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/jaegertracing/jaeger/pkg/config/tlscfg"
+	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
 )
 
 // GRPCServerParams to construct a new Jaeger Collector gRPC Server
 type ServerParams struct {
-	TLSConfig     tlscfg.Options
-	HostPort      string
-	Handler       *Handler
-	Logger        *zap.Logger
-	OnError       func(error)
+	TLSConfig tlscfg.Options
+	HostPort  string
+	Handler   *Handler
+	Logger    *zap.Logger
+	OnError   func(error)
 }
 
 func StartGRPCServer(params *ServerParams) (*grpc.Server, error) {
@@ -41,6 +42,8 @@ func StartGRPCServer(params *ServerParams) (*grpc.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on gRPC port: %w", err)
 	}
+
+	api_v2.RegisterQueryServiceServer(server, params.Handler)
 
 	if err := serveGRPC(server, listener, params); err != nil {
 		return nil, err
