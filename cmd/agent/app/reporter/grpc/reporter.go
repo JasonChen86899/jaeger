@@ -17,7 +17,8 @@ package grpc
 
 import (
 	"context"
-
+	"github.com/jaegertracing/jaeger/cmd/agent/app/reporter/tailbasedsampling/buffer"
+	grpc2 "github.com/jaegertracing/jaeger/cmd/agent/app/reporter/tailbasedsampling/grpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -36,16 +37,24 @@ type Reporter struct {
 	agentTags []model.KeyValue
 	logger    *zap.Logger
 	sanitizer zipkin2.Sanitizer
+
+	tbsOpts          *grpc2.TailBasedSamplingOptions
+	timeWindowBuffer *buffer.WindowBuffer
 }
 
 // NewReporter creates gRPC reporter.
-func NewReporter(conn *grpc.ClientConn, agentTags map[string]string, logger *zap.Logger) *Reporter {
-	return &Reporter{
+func NewReporter(conn *grpc.ClientConn, agentTags map[string]string, logger *zap.Logger, tbsOpts *grpc2.TailBasedSamplingOptions) *Reporter {
+	r := &Reporter{
 		collector: api_v2.NewCollectorServiceClient(conn),
 		agentTags: makeModelKeyValue(agentTags),
 		logger:    logger,
 		sanitizer: zipkin2.NewChainedSanitizer(zipkin2.StandardSanitizers...),
+
+		tbsOpts: tbsOpts,
 	}
+
+	openTailBasedSampling(r)
+	return r
 }
 
 // EmitBatch implements EmitBatch() of Reporter
@@ -100,4 +109,51 @@ func makeModelKeyValue(agentTags map[string]string) []model.KeyValue {
 	}
 
 	return tags
+}
+
+func (r *Reporter) wrapWithSend(ctx context.Context, spans []*model.Span, process *model.Process) error {
+	reportSpans := r.filterSpans(spans)
+	return r.send(ctx, reportSpans, process)
+}
+
+func openTailBasedSampling(r *Reporter) {
+	if r.tbsOpts.Open {
+		// tail-based sampling open. Open a grpc server for collector query
+		_, err := grpc2.StartGRPCServer(&grpc2.ServerParams{
+			TLSConfig: r.tbsOpts.TLS,
+			HostPort:  r.tbsOpts.GRPCHostPort,
+			Handler:   grpc2.NewGRPCHandler(r.timeWindowBuffer, r.logger),
+			Logger:    r.logger,
+			OnError: func(err error) {
+				r.logger.Error("reporter tail-based sampling has err", zap.String("err", err.Error()))
+			},
+		})
+		if err != nil {
+			r.logger.Error("Reporter tail-based sampling server start err", zap.Error(err))
+			return
+		}
+		// init buffer
+		r.timeWindowBuffer = buffer.NewWindowBuffer(10)
+	}
+}
+
+func (r *Reporter) filterSpans(spans []*model.Span) (reportSpans []*model.Span) {
+	for _, span := range spans {
+		for _, kv := range span.Tags {
+			switch kv.Key {
+			case grpc2.TagKeyHttpStatusCode:
+				if kv.VInt64 == grpc2.TagValueHttpStatusCode {
+					reportSpans = append(reportSpans, span)
+				}
+			case grpc2.TagKeyError:
+				if kv.VInt64 == grpc2.TagValueError {
+					reportSpans = append(reportSpans, span)
+				}
+			default:
+				r.timeWindowBuffer.Put(span.TraceID.String(), span)
+			}
+		}
+	}
+
+	return reportSpans
 }

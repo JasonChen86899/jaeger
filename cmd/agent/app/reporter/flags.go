@@ -17,6 +17,7 @@ package reporter
 import (
 	"flag"
 	"fmt"
+	tail_based_sampling "github.com/jaegertracing/jaeger/cmd/agent/app/reporter/tailbasedsampling/grpc"
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -33,6 +34,9 @@ const (
 	agentTags           = "agent.tags"
 	// GRPC is name of gRPC reporter.
 	GRPC Type = "grpc"
+
+	// tail-based Sampling
+	tailBasedSampling = "tail-based-sampling.open"
 )
 
 // Type defines type of reporter.
@@ -42,6 +46,8 @@ type Type string
 type Options struct {
 	ReporterType Type
 	AgentTags    map[string]string
+
+	TailBasedSampling *tail_based_sampling.TailBasedSamplingOptions
 }
 
 // AddFlags adds flags for Options.
@@ -51,6 +57,8 @@ func AddFlags(flags *flag.FlagSet) {
 		flags.String(AgentTagsDeprecated, "", "(deprecated) see --"+agentTags)
 		flags.String(agentTags, "", "One or more tags to be added to the Process tags of all spans passing through this agent. Ex: key1=value1,key2=${envVar:defaultValue}")
 	}
+
+	tail_based_sampling.AddFlags(flags)
 }
 
 // InitFromViper initializes Options with properties retrieved from Viper.
@@ -65,5 +73,7 @@ func (b *Options) InitFromViper(v *viper.Viper, logger *zap.Logger) *Options {
 			b.AgentTags = flags.ParseJaegerTags(v.GetString(agentTags))
 		}
 	}
+
+	b.TailBasedSampling = new(tail_based_sampling.TailBasedSamplingOptions).InitFromViper(v)
 	return b
 }

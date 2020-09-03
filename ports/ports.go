@@ -30,6 +30,8 @@ const (
 	AgentConfigServerHTTP = 5778
 	// AgentAdminHTTP is the default admin HTTP port (health check, metrics, etc.)
 	AgentAdminHTTP = 14271
+	// ReportTailBasedSamplingGRPC is the default port for gRPC server for sending spans
+	ReportTailBasedSamplingGRPC = 14272
 
 	// CollectorGRPC is the default port for gRPC server for sending spans
 	CollectorGRPC = 14250

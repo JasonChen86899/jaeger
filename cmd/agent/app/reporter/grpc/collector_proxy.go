@@ -15,6 +15,7 @@
 package grpc
 
 import (
+	tail_based_sampling "github.com/jaegertracing/jaeger/cmd/agent/app/reporter/tailbasedsampling/grpc"
 	"io"
 
 	"github.com/uber/jaeger-lib/metrics"
@@ -36,13 +37,14 @@ type ProxyBuilder struct {
 }
 
 // NewCollectorProxy creates ProxyBuilder
-func NewCollectorProxy(builder *ConnBuilder, agentTags map[string]string, mFactory metrics.Factory, logger *zap.Logger) (*ProxyBuilder, error) {
+func NewCollectorProxy(builder *ConnBuilder, agentTags map[string]string, mFactory metrics.Factory, logger *zap.Logger,
+	tbsOpts *tail_based_sampling.TailBasedSamplingOptions) (*ProxyBuilder, error) {
 	conn, err := builder.CreateConnection(logger)
 	if err != nil {
 		return nil, err
 	}
 	grpcMetrics := mFactory.Namespace(metrics.NSOptions{Name: "", Tags: map[string]string{"protocol": "grpc"}})
-	r1 := NewReporter(conn, agentTags, logger)
+	r1 := NewReporter(conn, agentTags, logger, tbsOpts)
 	r2 := reporter.WrapWithMetrics(r1, grpcMetrics)
 	r3 := reporter.WrapWithClientMetrics(reporter.ClientMetricsReporterParams{
 		Reporter:       r2,

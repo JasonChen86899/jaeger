@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/jaegertracing/jaeger/cmd/collector/app/handler"
 	"github.com/jaegertracing/jaeger/pkg/config/tlscfg"
 )
 
@@ -16,7 +15,7 @@ import (
 type ServerParams struct {
 	TLSConfig     tlscfg.Options
 	HostPort      string
-	Handler       *handler.GRPCHandler
+	Handler       *Handler
 	Logger        *zap.Logger
 	OnError       func(error)
 }
