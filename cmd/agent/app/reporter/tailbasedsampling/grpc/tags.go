@@ -1,10 +1,11 @@
 package grpc
 
 const (
-	TagKeyHttpStatusCode = "http.status_code"
-	TagValueHttpStatusCode = int64(200)
+	TraceErrorTagKey             = "tag.tail_based_sampling.error"
+	TraceParentErrorTagValue     = 1
+	TraceSelfErrorTagValue       = 0
 
-	TagKeyError = "error"
-	TagValueError = 1
+	TraceErrorBaggageKey         = "baggage.tail_based_sampling.error"
+	TraceParentErrorBaggageValue = "1"
+	TraceSelfErrorBaggageValue   = "0"
 )
-

@@ -30,7 +30,7 @@ type TailBasedSamplingOptions struct {
 
 // AddFlags adds flags for CollectorOptions
 func AddFlags(flags *flag.FlagSet) {
-	flags.Bool(ReportTailBasedSamplingOpen, false, fmt.Sprintf("Set the reporter tail-based-sampling server open or close"))
+	flags.Bool(ReportTailBasedSamplingOpen, true, fmt.Sprintf("Set the reporter tail-based-sampling server open or close"))
 	AddOTELJaegerFlags(flags)
 }
 
@@ -42,7 +42,8 @@ func AddOTELJaegerFlags(flags *flag.FlagSet) {
 
 // InitFromViper initializes CollectorOptions with properties from viper
 func (cOpts *TailBasedSamplingOptions) InitFromViper(v *viper.Viper) *TailBasedSamplingOptions {
-	cOpts.GRPCHostPort = ports.PortToHostPort(v.GetInt(ReportTailBasedSamplingGRPCHostPort))
+	cOpts.Open = v.GetBool(ReportTailBasedSamplingOpen)
+	cOpts.GRPCHostPort = v.GetString(ReportTailBasedSamplingGRPCHostPort)
 	cOpts.TLS = tlsFlagsConfig.InitFromViper(v)
 	return cOpts
 }

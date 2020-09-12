@@ -139,19 +139,25 @@ func openTailBasedSampling(r *Reporter) {
 
 func (r *Reporter) filterSpans(spans []*model.Span) (reportSpans []*model.Span) {
 	for _, span := range spans {
+		reported := false
 		for _, kv := range span.Tags {
-			switch kv.Key {
-			case grpc2.TagKeyHttpStatusCode:
-				if kv.VInt64 == grpc2.TagValueHttpStatusCode {
-					reportSpans = append(reportSpans, span)
-				}
-			case grpc2.TagKeyError:
-				if kv.VInt64 == grpc2.TagValueError {
-					reportSpans = append(reportSpans, span)
-				}
-			default:
-				r.timeWindowBuffer.Put(span.TraceID.String(), span)
+			if reported {
+				break
 			}
+
+			switch kv.Key {
+			case grpc2.TraceErrorTagKey:
+				if kv.VInt64 == grpc2.TraceSelfErrorTagValue ||
+					kv.VInt64 == grpc2.TraceParentErrorTagValue {
+					reportSpans = append(reportSpans, span)
+					reported = true
+				}
+			}
+		}
+
+		if !reported {
+			// normal span put into buffer
+			r.timeWindowBuffer.Put(span.TraceID.String(), span)
 		}
 	}
 
