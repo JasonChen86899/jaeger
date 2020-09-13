@@ -17,15 +17,18 @@ type ConnBuilder struct {
 }
 
 // NewConnBuilder creates a new grpc connection builder.
-func NewConnBuilder() *ConnBuilder {
-	return &ConnBuilder{}
+func NewConnBuilder(options *TailBasedSamplingOptions) *ConnBuilder {
+	return &ConnBuilder{
+		MaxRetry: options.MaxRetry,
+		TLS:      options.TLS,
+	}
 }
 
 // CreateConnection creates the gRPC connection
 func (b *ConnBuilder) createConnection(dialTarget string, logger *zap.Logger) (*grpc.ClientConn, error) {
 	var dialOptions []grpc.DialOption
 	if b.TLS.Enabled { // user requested a secure connection
-		logger.Info("Agent requested secure grpc connection to collector(s)")
+		logger.Info("Collector requested secure grpc connection to agent")
 		tlsConf, err := b.TLS.Config(logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load TLS config: %w", err)
@@ -34,7 +37,7 @@ func (b *ConnBuilder) createConnection(dialTarget string, logger *zap.Logger) (*
 		creds := credentials.NewTLS(tlsConf)
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	} else { // insecure connection
-		logger.Info("Agent requested insecure grpc connection to collector(s)")
+		logger.Info("Collector requested insecure grpc connection to agent")
 		dialOptions = append(dialOptions, grpc.WithInsecure())
 	}
 

@@ -83,6 +83,7 @@ func (c *Collector) Start(builderOpts *CollectorOptions) error {
 
 	c.spanProcessor = handlerBuilder.BuildSpanProcessor()
 	c.spanHandlers = handlerBuilder.BuildHandlers(c.spanProcessor)
+	c.spanHandlers.BuildTbsHandler(builderOpts.tbsOpts)
 
 	if grpcServer, err := server.StartGRPCServer(&server.GRPCServerParams{
 		HostPort:      builderOpts.CollectorGRPCHostPort,

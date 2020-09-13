@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/jaegertracing/jaeger/cmd/collector/app/processor"
+	tbs "github.com/jaegertracing/jaeger/cmd/collector/app/sampling/tail_based_sampling/grpc"
 	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
 )
 
@@ -29,6 +30,8 @@ import (
 type GRPCHandler struct {
 	logger        *zap.Logger
 	spanProcessor processor.SpanProcessor
+
+	tbsHandler *tbs.TailBasedSamplingHandler
 }
 
 // NewGRPCHandler registers routes for this handler on the given router.
@@ -37,6 +40,10 @@ func NewGRPCHandler(logger *zap.Logger, spanProcessor processor.SpanProcessor) *
 		logger:        logger,
 		spanProcessor: spanProcessor,
 	}
+}
+
+func (g *GRPCHandler) InitTbsHandler(builder *tbs.ConnBuilder) {
+	g.tbsHandler = tbs.NewTailBasedSamplingHandler(g.logger, builder, g.spanProcessor)
 }
 
 // PostSpans implements gRPC CollectorService.
@@ -57,5 +64,10 @@ func (g *GRPCHandler) PostSpans(ctx context.Context, r *api_v2.PostSpansRequest)
 		g.logger.Error("cannot process spans", zap.Error(err))
 		return nil, err
 	}
+
+	if g.tbsHandler != nil {
+		g.tbsHandler.FilterSpans(r.GetBatch().Spans)
+	}
+
 	return &api_v2.PostSpansResponse{}, nil
 }

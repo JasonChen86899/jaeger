@@ -2,11 +2,14 @@ package grpc
 
 import (
 	"context"
-	"github.com/jaegertracing/jaeger/model"
-	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
+
+	"github.com/jaegertracing/jaeger/cmd/collector/app/processor"
+	"github.com/jaegertracing/jaeger/model"
+	"github.com/jaegertracing/jaeger/proto-gen/api_v2"
 )
 
 const (
@@ -20,27 +23,31 @@ const (
 )
 
 // GRPCHandler get span with traceID from agent.
-type Handler struct {
+type TailBasedSamplingHandler struct {
 	logger      *zap.Logger
 	connBuilder *ConnBuilder
 
 	once        sync.Once
 	requestChan chan *model.Span
+
+	spanProcessor processor.SpanProcessor
 }
 
-func NewTailBasedSamplingHandler() *Handler {
-	return &Handler{
-		logger:      nil,
-		connBuilder: nil,
+func NewTailBasedSamplingHandler(logger *zap.Logger, builder *ConnBuilder, processor processor.SpanProcessor) *TailBasedSamplingHandler {
+	return &TailBasedSamplingHandler{
+		logger:      logger,
+		connBuilder: builder,
 
 		once:        sync.Once{},
 		requestChan: make(chan *model.Span, defaultRequestChannelSize),
+
+		spanProcessor: processor,
 	}
 }
 
-func (h *Handler) filterSpans(spans []*model.Span) {
+func (h *TailBasedSamplingHandler) FilterSpans(spans []*model.Span) {
 	h.once.Do(func() {
-		go h.processRequest()
+		go h.daemonProcessRequest()
 	})
 
 	// filter span for next process
@@ -56,7 +63,7 @@ func (h *Handler) filterSpans(spans []*model.Span) {
 	}
 }
 
-func (h *Handler) processRequest() {
+func (h *TailBasedSamplingHandler) daemonProcessRequest() {
 	for {
 		select {
 		case span := <-h.requestChan:
@@ -64,14 +71,30 @@ func (h *Handler) processRequest() {
 				if kv.Key == servicesIPsTagKey {
 					ips := kv.VStr
 					ipList := strings.Split(ips, ",")
+					// remove it self ip
 					ipList = ipList[:len(ipList)-1]
 
 					// do grpc request
+					spans := make([]*model.Span, 0, len(ipList))
+					w := sync.WaitGroup{}
+					w.Add(len(ipList))
 					for _, ip := range ipList {
+						agentIP := ip
 						go func() {
-							agentSpan := h.grpcRequest(ip, span.TraceID)
-
+							agentSpan := h.grpcRequest(agentIP, span.TraceID)
+							spans = append(spans, agentSpan)
+							w.Done()
 						}()
+					}
+					w.Wait()
+
+					// batch process
+					_, err := h.spanProcessor.ProcessSpans(spans, processor.SpansOptions{
+						InboundTransport: processor.GRPCTransport,
+						SpanFormat:       processor.ProtoSpanFormat,
+					})
+					if err != nil {
+						h.logger.Error("tail based sampling handler process spans", zap.Error(err))
 					}
 				}
 			}
@@ -79,7 +102,7 @@ func (h *Handler) processRequest() {
 	}
 }
 
-func (h *Handler) grpcRequest(agentIP string, traceID model.TraceID) *model.Span {
+func (h *TailBasedSamplingHandler) grpcRequest(agentIP string, traceID model.TraceID) *model.Span {
 	gConn, err := h.connBuilder.GetConnection(agentIP)
 	if err != nil {
 		h.logger.Error("Collector with tail based sampling build grpc connection to agent failed",

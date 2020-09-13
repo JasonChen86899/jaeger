@@ -20,6 +20,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	tbs "github.com/jaegertracing/jaeger/cmd/collector/app/sampling/tail_based_sampling/grpc"
 	"github.com/jaegertracing/jaeger/cmd/flags"
 	"github.com/jaegertracing/jaeger/pkg/config/tlscfg"
 	"github.com/jaegertracing/jaeger/ports"
@@ -75,6 +76,8 @@ type CollectorOptions struct {
 	CollectorZipkinAllowedOrigins string
 	// CollectorZipkinAllowedHeaders is a list of headers that the Zipkin collector service allowes the client to use with cross-domain requests
 	CollectorZipkinAllowedHeaders string
+
+	tbsOpts *tbs.TailBasedSamplingOptions
 }
 
 // AddFlags adds flags for CollectorOptions
@@ -90,6 +93,8 @@ func AddFlags(flags *flag.FlagSet) {
 	flags.String(collectorZipkinAllowedHeaders, "content-type", "Comma separated list of allowed headers for the Zipkin collector service, default content-type")
 	AddOTELJaegerFlags(flags)
 	AddOTELZipkinFlags(flags)
+
+	tbs.AddFlags(flags)
 }
 
 // AddOTELJaegerFlags adds flags that are exposed by OTEL Jaeger receier
@@ -116,5 +121,8 @@ func (cOpts *CollectorOptions) InitFromViper(v *viper.Viper) *CollectorOptions {
 	cOpts.CollectorZipkinAllowedOrigins = v.GetString(collectorZipkinAllowedOrigins)
 	cOpts.CollectorZipkinAllowedHeaders = v.GetString(collectorZipkinAllowedHeaders)
 	cOpts.TLS = tlsFlagsConfig.InitFromViper(v)
+
+	cOpts.tbsOpts = tbs.NewTailBasedSamplingOptions()
+	cOpts.tbsOpts.InitFromViper(v)
 	return cOpts
 }

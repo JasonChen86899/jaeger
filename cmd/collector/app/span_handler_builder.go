@@ -23,6 +23,7 @@ import (
 
 	"github.com/jaegertracing/jaeger/cmd/collector/app/handler"
 	"github.com/jaegertracing/jaeger/cmd/collector/app/processor"
+	tbs "github.com/jaegertracing/jaeger/cmd/collector/app/sampling/tail_based_sampling/grpc"
 	zs "github.com/jaegertracing/jaeger/cmd/collector/app/sanitizer/zipkin"
 	"github.com/jaegertracing/jaeger/model"
 	"github.com/jaegertracing/jaeger/storage/spanstore"
@@ -70,6 +71,13 @@ func (b *SpanHandlerBuilder) BuildHandlers(spanProcessor processor.SpanProcessor
 		handler.NewZipkinSpanHandler(b.Logger, spanProcessor, zs.NewChainedSanitizer(zs.StandardSanitizers...)),
 		handler.NewJaegerSpanHandler(b.Logger, spanProcessor),
 		handler.NewGRPCHandler(b.Logger, spanProcessor),
+	}
+}
+
+// BuildHandlers builds tail based sampling handler
+func (b *SpanHandlers) BuildTbsHandler(tbsOpts *tbs.TailBasedSamplingOptions) {
+	if tbsOpts.Open {
+		b.GRPCHandler.InitTbsHandler(tbs.NewConnBuilder(tbsOpts))
 	}
 }
 

@@ -9,41 +9,38 @@ import (
 )
 
 const (
-	ReportTailBasedSamplingOpen   = "report.tail-based-sampling.open"
-	// CollectorGRPCHostPort is the flag for collector gRPC port
-	ReportTailBasedSamplingGRPCHostPort   = "report.tail-based-sampling.grpc-server.host-port"
+	reportTailBasedSamplingOpen   = "reporter.tail-based-sampling.open"
 )
 
 var tlsFlagsConfig = tlscfg.ServerFlagsConfig{
-	Prefix:       "report.tail-based-sampling.grpc",
+	Prefix:       "reporter.tail-based-sampling.grpc",
 	ShowEnabled:  true,
 	ShowClientCA: true,
 }
 
 type TailBasedSamplingOptions struct {
 	Open bool
-	// CollectorGRPCHostPort is the host:port address that the reporter service listens in on for gRPC requests
+	// GRPCHostPort is the host:port address that the reporter service listens on for gRPC requests
 	GRPCHostPort string
 	// TLS configures secure transport
 	TLS tlscfg.Options
 }
 
-// AddFlags adds flags for CollectorOptions
+// AddFlags adds flags for reporter TailBasedSamplingOptions
 func AddFlags(flags *flag.FlagSet) {
-	flags.Bool(ReportTailBasedSamplingOpen, true, fmt.Sprintf("Set the reporter tail-based-sampling server open or close"))
-	AddOTELJaegerFlags(flags)
+	flags.Bool(reportTailBasedSamplingOpen, true, fmt.Sprintf("Set the reporter tail-based-sampling server open or close"))
+	AddGrpcFlags(flags)
 }
 
-// AddOTELJaegerFlags adds flags that are exposed by OTEL Jaeger receier
-func AddOTELJaegerFlags(flags *flag.FlagSet) {
-	flags.String(ReportTailBasedSamplingGRPCHostPort, ports.PortToHostPort(ports.ReportTailBasedSamplingGRPC), "The port (e.g. :9411) of the report tail-based-sampling server")
+// AddOTELJaegerFlags adds flags that with grpc server used by reporter TailBasedSamplingOptions
+func AddGrpcFlags(flags *flag.FlagSet) {
 	tlsFlagsConfig.AddFlags(flags)
 }
 
 // InitFromViper initializes CollectorOptions with properties from viper
 func (cOpts *TailBasedSamplingOptions) InitFromViper(v *viper.Viper) *TailBasedSamplingOptions {
-	cOpts.Open = v.GetBool(ReportTailBasedSamplingOpen)
-	cOpts.GRPCHostPort = v.GetString(ReportTailBasedSamplingGRPCHostPort)
+	cOpts.Open = v.GetBool(reportTailBasedSamplingOpen)
+	cOpts.GRPCHostPort = ports.PortToHostPort(ports.ReportTailBasedSamplingGRPC)
 	cOpts.TLS = tlsFlagsConfig.InitFromViper(v)
 	return cOpts
 }
