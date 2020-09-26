@@ -41,12 +41,12 @@ func (b *ConnBuilder) createConnection(dialTarget string, logger *zap.Logger) (*
 		dialOptions = append(dialOptions, grpc.WithInsecure())
 	}
 
-
 	dialOptions = append(dialOptions, grpc.WithDefaultServiceConfig(grpcresolver.GRPCServiceConfig))
 	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(grpc_retry.WithMax(b.MaxRetry))))
 	return grpc.Dial(dialTarget, dialOptions...)
 }
 
-func (b *ConnBuilder)GetConnection(agentIP string) (*grpc.ClientConn, error) {
-	return nil, nil
+func (b *ConnBuilder) GetConnection(agentIP string, logger *zap.Logger) (*grpc.ClientConn, error) {
+	// TODO
+	return b.createConnection(agentIP, logger)
 }
