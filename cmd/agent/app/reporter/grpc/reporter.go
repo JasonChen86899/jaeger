@@ -75,7 +75,6 @@ func (r *Reporter) EmitZipkinBatch(ctx context.Context, zSpans []*zipkincore.Spa
 }
 
 func (r *Reporter) send(ctx context.Context, spans []*model.Span, process *model.Process) error {
-	spans, process = addProcessTags(spans, process, r.agentTags)
 	batch := model.Batch{Spans: spans, Process: process}
 	req := &api_v2.PostSpansRequest{Batch: batch}
 	_, err := r.collector.PostSpans(ctx, req)
@@ -112,12 +111,16 @@ func makeModelKeyValue(agentTags map[string]string) []model.KeyValue {
 }
 
 func (r *Reporter) wrapWithSend(ctx context.Context, spans []*model.Span, process *model.Process) error {
-	reportSpans := r.filterSpans(spans)
+	spans, process = addProcessTags(spans, process, r.agentTags)
+	reportSpans := r.filterSpans(spans, process)
 	return r.send(ctx, reportSpans, process)
 }
 
 func openTailBasedSampling(r *Reporter) {
 	if r.tbsOpts.Open {
+		// init buffer
+		r.timeWindowBuffer = buffer.NewWindowBuffer(60*10)
+
 		// tail-based sampling open. Open a grpc server for collector query
 		_, err := grpc2.StartGRPCServer(&grpc2.ServerParams{
 			TLSConfig: r.tbsOpts.TLS,
@@ -132,12 +135,10 @@ func openTailBasedSampling(r *Reporter) {
 			r.logger.Error("Reporter tail-based sampling server start err", zap.Error(err))
 			return
 		}
-		// init buffer
-		r.timeWindowBuffer = buffer.NewWindowBuffer(10)
 	}
 }
 
-func (r *Reporter) filterSpans(spans []*model.Span) (reportSpans []*model.Span) {
+func (r *Reporter) filterSpans(spans []*model.Span, process *model.Process) (reportSpans []*model.Span) {
 	for _, span := range spans {
 		reported := false
 		for _, kv := range span.Tags {
@@ -157,6 +158,10 @@ func (r *Reporter) filterSpans(spans []*model.Span) (reportSpans []*model.Span) 
 
 		if !reported {
 			// normal span put into buffer
+			if span.GetProcess() == nil {
+				span.Process = process
+			}
+
 			r.timeWindowBuffer.Put(span.TraceID.String(), span)
 		}
 	}

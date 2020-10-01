@@ -16,7 +16,7 @@ type WindowBuffer struct {
 }
 
 type keyList struct {
-	creatTime int
+	creatTime int64
 	keys      map[string]struct{}
 }
 
@@ -44,12 +44,13 @@ func (wb *WindowBuffer) Put(key string, value *model.Span) {
 	wb.rwLock.Lock()
 	defer wb.rwLock.Unlock()
 
-	mapList := wb.bufferMap[key]
-	mapList = append(mapList, value)
+	spanList := wb.bufferMap[key]
+	spanList = append(spanList, value)
+	wb.bufferMap[key] = spanList
 
 	if v := wb.ringWindow.Value; v == nil {
 		wb.ringWindow.Value = &keyList{
-			creatTime: time.Now().Second(),
+			creatTime: time.Now().Unix(),
 			keys:      make(map[string]struct{}, 1024),
 		}
 	}
@@ -57,9 +58,12 @@ func (wb *WindowBuffer) Put(key string, value *model.Span) {
 	keys := wb.ringWindow.Value.(*keyList).keys
 
 	// check clean
-	if createTime+wb.windowSize <= time.Now().Second() {
-		keys = nil // set nil
-		keys = make(map[string]struct{}, 1024)
+	if createTime+int64(wb.windowSize) <= time.Now().Unix() {
+		// clean
+		for k, _ := range keys {
+			delete(wb.bufferMap, k)
+		}
+		wb.ringWindow.Value = nil
 	}
 	keys[key] = struct{}{}
 }

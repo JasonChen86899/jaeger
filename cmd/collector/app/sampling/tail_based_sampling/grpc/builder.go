@@ -5,6 +5,7 @@ import (
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/jaegertracing/jaeger/pkg/config/tlscfg"
 	"github.com/jaegertracing/jaeger/pkg/discovery/grpcresolver"
+	"github.com/jaegertracing/jaeger/ports"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -48,5 +49,6 @@ func (b *ConnBuilder) createConnection(dialTarget string, logger *zap.Logger) (*
 
 func (b *ConnBuilder) GetConnection(agentIP string, logger *zap.Logger) (*grpc.ClientConn, error) {
 	// TODO
-	return b.createConnection(agentIP, logger)
+	ipHost := agentIP + fmt.Sprintf(":%d", ports.ReportTailBasedSamplingGRPC)
+	return b.createConnection(ipHost, logger)
 }

@@ -71,12 +71,17 @@ func (h *TailBasedSamplingHandler) daemonProcessRequest() {
 				if kv.Key == servicesIPsTagKey {
 					ips := kv.VStr
 					ipList := strings.Split(ips, ",")
+					// Attention: if a span has not down stream, ipList will be only one
 					if len(ipList) <= 1 {
-						h.logger.Error("tail based sampling handler process spans: ips tag value err",
-							zap.Int("length of 'tag.services.ips' tag value", len(ipList)))
-						continue
+						break
 					}
-					// remove it self ip
+					if ipList[len(ipList)-1] == "" {
+						h.logger.Error("tail based sampling handler process spans: ips tag value err",
+							zap.Any("ipList", ipList))
+						break
+					}
+
+					// remove self ip and down stream ip
 					upStreamIPList := ipList[:len(ipList)-2]
 					if len(upStreamIPList) > 0 {
 						// do grpc request
@@ -87,7 +92,9 @@ func (h *TailBasedSamplingHandler) daemonProcessRequest() {
 							agentIP := ip
 							go func() {
 								agentSpan := h.grpcRequest(agentIP, span.TraceID)
-								spans = append(spans, agentSpan)
+								if agentSpan != nil {
+									spans = append(spans, agentSpan)
+								}
 								w.Done()
 							}()
 						}
@@ -127,6 +134,9 @@ func (h *TailBasedSamplingHandler) downStreamProcess(downStreamIP string, traceI
 	downStreamSpans []*model.Span) []*model.Span {
 
 	downSpan := h.grpcRequest(downStreamIP, traceID)
+	if downSpan == nil {
+		return downStreamSpans
+	}
 	downStreamSpans = append(downStreamSpans, downSpan)
 
 	for _, kv := range downSpan.Tags {
@@ -134,18 +144,17 @@ func (h *TailBasedSamplingHandler) downStreamProcess(downStreamIP string, traceI
 			ips := kv.VStr
 			ipList := strings.Split(ips, ",")
 			if len(ipList) <= 1 {
+				break
+			}
+			if ipList[len(ipList)-1] == "" {
 				h.logger.Error("tail based sampling handler process spans: downStreamProcess err",
-					zap.Int("length of 'tag.services.ips' tag value", len(ipList)))
-				continue
+					zap.Any("ipList", ipList))
+				break
 			}
 
 			// next down stream ip
-			newDownStreamIP := ipList[len(ipList)-1:][0]
-			if newDownStreamIP == "" {
-				return downStreamSpans
-			}
+			newDownStreamIP := ipList[len(ipList)-1]
 			// exist next down stream
-			// TODO
 			downStreamSpans = h.downStreamProcess(newDownStreamIP, downSpan.TraceID, downStreamSpans)
 		}
 	}
@@ -184,5 +193,8 @@ func (h *TailBasedSamplingHandler) grpcRequest(agentIP string, traceID model.Tra
 		return nil
 	}
 
+	if spansChunk == nil || len(spansChunk.Spans) == 0 {
+		return nil
+	}
 	return &spansChunk.Spans[0]
 }
