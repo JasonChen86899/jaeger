@@ -9,7 +9,10 @@ import (
 )
 
 const (
-	reportTailBasedSamplingOpen   = "reporter.tail-based-sampling.open"
+	reportTailBasedSamplingOpen             = "reporter.tail-based-sampling.open"
+	reportTailBasedSamplingBufferWindowSize = "reporter.tail-based-sampling.buffer-window-size"
+
+	defaultWindowSize = 60
 )
 
 var tlsFlagsConfig = tlscfg.ServerFlagsConfig{
@@ -24,11 +27,15 @@ type TailBasedSamplingOptions struct {
 	GRPCHostPort string
 	// TLS configures secure transport
 	TLS tlscfg.Options
+	// buffer window size
+	BufferWindowSize int
 }
 
 // AddFlags adds flags for reporter TailBasedSamplingOptions
 func AddFlags(flags *flag.FlagSet) {
 	flags.Bool(reportTailBasedSamplingOpen, true, fmt.Sprintf("Set the reporter tail-based-sampling server open or close"))
+	flags.Int(reportTailBasedSamplingBufferWindowSize, defaultWindowSize,
+		fmt.Sprintf("Set the reporter tail-based-sampling server buffer-window-size"))
 	AddGrpcFlags(flags)
 }
 
@@ -42,5 +49,6 @@ func (cOpts *TailBasedSamplingOptions) InitFromViper(v *viper.Viper) *TailBasedS
 	cOpts.Open = v.GetBool(reportTailBasedSamplingOpen)
 	cOpts.GRPCHostPort = ports.PortToHostPort(ports.ReportTailBasedSamplingGRPC)
 	cOpts.TLS = tlsFlagsConfig.InitFromViper(v)
+	cOpts.BufferWindowSize = v.GetInt(reportTailBasedSamplingBufferWindowSize)
 	return cOpts
 }

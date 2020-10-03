@@ -119,7 +119,7 @@ func (r *Reporter) wrapWithSend(ctx context.Context, spans []*model.Span, proces
 func openTailBasedSampling(r *Reporter) {
 	if r.tbsOpts.Open {
 		// init buffer
-		r.timeWindowBuffer = buffer.NewWindowBuffer(60*10)
+		r.timeWindowBuffer = buffer.NewWindowBuffer(r.tbsOpts.BufferWindowSize)
 
 		// tail-based sampling open. Open a grpc server for collector query
 		_, err := grpc2.StartGRPCServer(&grpc2.ServerParams{

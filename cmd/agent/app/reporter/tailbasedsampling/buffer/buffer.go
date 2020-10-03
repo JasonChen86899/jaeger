@@ -54,25 +54,31 @@ func (wb *WindowBuffer) Put(key string, value *model.Span) {
 			keys:      make(map[string]struct{}, 1024),
 		}
 	}
-	createTime := wb.ringWindow.Value.(*keyList).creatTime
-	keys := wb.ringWindow.Value.(*keyList).keys
-
-	// check clean
-	if createTime+int64(wb.windowSize) <= time.Now().Unix() {
-		// clean
-		for k, _ := range keys {
-			delete(wb.bufferMap, k)
-		}
-		wb.ringWindow.Value = nil
-	}
-	keys[key] = struct{}{}
+	// add to keys set
+	wb.ringWindow.Value.(*keyList).keys[key] = struct{}{}
 }
 
 func (wb *WindowBuffer) loopClean() {
 	for {
+		// second time sleep loop
+		time.Sleep(time.Second)
+
 		wb.rwLock.Lock()
 		wb.ringWindow = wb.ringWindow.Next()
+
+		if v := wb.ringWindow.Value; v != nil {
+			createTime := wb.ringWindow.Value.(*keyList).creatTime
+			keys := wb.ringWindow.Value.(*keyList).keys
+			// check clean
+			if createTime+int64(wb.windowSize) <= time.Now().Unix() {
+				// clean expired keys
+				for k, _ := range keys {
+					delete(wb.bufferMap, k)
+				}
+				wb.ringWindow.Value = nil
+			}
+		}
+
 		wb.rwLock.Unlock()
-		time.Sleep(time.Second)
 	}
 }
